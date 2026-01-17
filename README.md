@@ -53,7 +53,7 @@
 1. **克隆仓库**
 
 ```bash
-git clone https://lsqkk.github.io/lsqkk/FileManager
+git clone https://lsqkk.github.io/lsqkk/FileManager.git
 cd FileManager
 ```
 您也可以选择下载项目`zip`并解压。
