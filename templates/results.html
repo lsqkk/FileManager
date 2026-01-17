@@ -1,0 +1,571 @@
+<!-- templates/results.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="results-page">
+    <div class="page-header">
+        <h1><i class="fas fa-list-check"></i> 分类结果</h1>
+        <p class="subtitle">查看和调整AI分类结果</p>
+    </div>
+
+    <div class="results-summary">
+        <div class="summary-card">
+            <h3><i class="fas fa-chart-bar"></i> 统计概览</h3>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <span class="summary-label">总文件数:</span>
+                    <span class="summary-value" id="total-files">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">分类数量:</span>
+                    <span class="summary-value" id="category-count">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">处理批次:</span>
+                    <span class="summary-value" id="batch-count">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">调整次数:</span>
+                    <span class="summary-value" id="adjust-count">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <button onclick="loadResults()" class="btn btn-secondary">
+            <i class="fas fa-sync"></i> 刷新结果
+        </button>
+        <button onclick="adjustAll()" class="btn btn-info">
+            <i class="fas fa-edit"></i> 批量调整
+        </button>
+        <button onclick="executeClassification()" class="btn btn-success">
+            <i class="fas fa-play"></i> 执行分类
+        </button>
+        <button onclick="window.location.href='/'" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 返回
+        </button>
+    </div>
+
+    <div class="results-table-container">
+        <table class="results-table" id="results-table">
+            <thead>
+                <tr>
+                    <th width="50">序号</th>
+                    <th>文件名</th>
+                    <th width="200">AI分类</th>
+                    <th width="200">调整分类</th>
+                    <th width="100">操作</th>
+                </tr>
+            </thead>
+            <tbody id="results-body">
+                <!-- 动态加载 -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="category-preview">
+        <h3><i class="fas fa-folder"></i> 分类预览</h3>
+        <div id="category-preview-content">
+            <!-- 动态生成 -->
+        </div>
+    </div>
+
+    <div class="final-actions" id="final-actions" style="display: none;">
+        <h3><i class="fas fa-check-circle"></i> 完成分类</h3>
+        <p>所有文件已分类完成，准备执行最终操作</p>
+
+        <div class="action-buttons">
+            <button onclick="confirmClassification()" class="btn btn-success">
+                <i class="fas fa-check"></i> 确认执行分类
+            </button>
+            <button onclick="rollbackClassification()" class="btn btn-warning">
+                <i class="fas fa-undo"></i> 撤回分类
+            </button>
+            <button onclick="cleanupFiles()" class="btn btn-danger">
+                <i class="fas fa-trash"></i> 清理源文件
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .results-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 0;
+    }
+
+    .results-summary {
+        margin-bottom: 2rem;
+    }
+
+    .summary-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+    }
+
+    .summary-card h3 {
+        margin-bottom: 1rem;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+    }
+
+    .summary-label {
+        color: var(--text-secondary);
+        font-weight: 500;
+    }
+
+    .summary-value {
+        font-weight: 600;
+        color: var(--primary-color);
+        font-size: 1.2rem;
+    }
+
+    .action-bar {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .results-table-container {
+        background: var(--card-bg);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        margin-bottom: 2rem;
+    }
+
+    .results-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .results-table th {
+        background: var(--bg-color);
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-primary);
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .results-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .results-table tr:hover {
+        background: var(--bg-color);
+    }
+
+    .results-table select {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background: white;
+    }
+
+    .category-preview {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+        margin-bottom: 2rem;
+    }
+
+    .category-preview h3 {
+        margin-bottom: 1rem;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .category-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1rem;
+    }
+
+    .category-item {
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        border-left: 4px solid var(--primary-color);
+    }
+
+    .category-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .category-name {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .file-count {
+        background: var(--primary-color);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.875rem;
+    }
+
+    .file-list {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    .file-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+    }
+
+    .file-item:last-child {
+        border-bottom: none;
+    }
+
+    .final-actions {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: var(--shadow);
+        text-align: center;
+    }
+
+    .final-actions h3 {
+        margin-bottom: 1rem;
+        color: var(--success-color);
+    }
+
+    .final-actions p {
+        color: var(--text-secondary);
+        margin-bottom: 1.5rem;
+    }
+
+    .btn-warning {
+        background-color: var(--warning-color);
+        color: white;
+    }
+
+    .btn-danger {
+        background-color: var(--error-color);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let categories = [];
+    let results = [];
+    let adjustments = new Map();
+
+    document.addEventListener('DOMContentLoaded', function () {
+        loadResults();
+    });
+
+    function loadResults() {
+        fetch('/api/classify/results')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    categories = data.categories;
+                    results = data.results;
+
+                    updateSummary(data);
+                    renderTable();
+                    renderCategoryPreview();
+
+                    document.getElementById('final-actions').style.display = 'block';
+                } else {
+                    window.fileClassifier.showNotification('加载结果失败: ' + data.message, 'error');
+                }
+            });
+    }
+
+    function updateSummary(data) {
+        document.getElementById('total-files').textContent = data.total_files;
+        document.getElementById('category-count').textContent = data.categories.length;
+        document.getElementById('batch-count').textContent = Math.ceil(data.total_files / 30);
+        document.getElementById('adjust-count').textContent = adjustments.size;
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('results-body');
+        tbody.innerHTML = '';
+
+        results.forEach(item => {
+            const row = document.createElement('tr');
+
+            // 获取调整后的分类索引
+            const adjustedIndex = adjustments.get(item.id) || item.category_index;
+
+            row.innerHTML = `
+            <td>${item.id}</td>
+            <td>${item.filename}</td>
+            <td>
+                <span class="category-badge" style="background: ${getCategoryColor(item.category_index)}">
+                    ${item.category}
+                </span>
+            </td>
+            <td>
+                <select class="category-select" 
+                        data-file-id="${item.id}"
+                        onchange="adjustCategory(this)">
+                    ${categories.map((cat, idx) => `
+                        <option value="${idx}" ${idx === adjustedIndex ? 'selected' : ''}>
+                            ${cat}
+                        </option>
+                    `).join('')}
+                </select>
+            </td>
+            <td>
+                <button onclick="resetCategory(${item.id})" class="btn-small btn-secondary">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </td>
+        `;
+
+            tbody.appendChild(row);
+        });
+    }
+
+    function renderCategoryPreview() {
+        const container = document.getElementById('category-preview-content');
+        const categoryStats = {};
+
+        // 统计每个分类的文件数
+        results.forEach(item => {
+            const catIndex = adjustments.get(item.id) || item.category_index;
+            if (!categoryStats[catIndex]) {
+                categoryStats[catIndex] = {
+                    name: categories[catIndex],
+                    count: 0,
+                    files: []
+                };
+            }
+            categoryStats[catIndex].count++;
+            categoryStats[catIndex].files.push(item.filename);
+        });
+
+        const html = Object.values(categoryStats).map(stat => `
+        <div class="category-item">
+            <div class="category-header">
+                <span class="category-name">${stat.name}</span>
+                <span class="file-count">${stat.count} 个文件</span>
+            </div>
+            <div class="file-list">
+                ${stat.files.slice(0, 5).map(file => `
+                    <div class="file-item">${file}</div>
+                `).join('')}
+                ${stat.files.length > 5 ? `<div class="file-item">... 还有 ${stat.files.length - 5} 个文件</div>` : ''}
+            </div>
+        </div>
+    `).join('');
+
+        container.innerHTML = `<div class="category-grid">${html}</div>`;
+    }
+
+    function getCategoryColor(index) {
+        const colors = [
+            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+            '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'
+        ];
+        return colors[index % colors.length];
+    }
+
+    function adjustCategory(select) {
+        const fileId = parseInt(select.dataset.fileId);
+        const categoryIndex = parseInt(select.value);
+
+        adjustments.set(fileId, categoryIndex);
+
+        // 更新调整计数
+        document.getElementById('adjust-count').textContent = adjustments.size;
+
+        // 重新渲染预览
+        renderCategoryPreview();
+
+        // 保存调整到服务器
+        fetch('/api/classify/adjust', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                file_id: fileId,
+                category_index: categoryIndex
+            })
+        });
+    }
+
+    function resetCategory(fileId) {
+        adjustments.delete(fileId);
+        document.getElementById('adjust-count').textContent = adjustments.size;
+
+        // 重置选择框
+        const select = document.querySelector(`select[data-file-id="${fileId}"]`);
+        const originalIndex = results.find(r => r.id === fileId).category_index;
+        select.value = originalIndex;
+
+        renderCategoryPreview();
+
+        // 通知服务器
+        fetch('/api/classify/adjust', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                file_id: fileId,
+                category_index: originalIndex
+            })
+        });
+    }
+
+    function adjustAll() {
+        if (confirm('是否将所有文件调整为第一个分类？')) {
+            const firstCategoryIndex = 0;
+
+            results.forEach(item => {
+                adjustments.set(item.id, firstCategoryIndex);
+            });
+
+            document.getElementById('adjust-count').textContent = adjustments.size;
+
+            // 更新所有选择框
+            document.querySelectorAll('.category-select').forEach(select => {
+                select.value = firstCategoryIndex;
+            });
+
+            renderCategoryPreview();
+
+            // 批量保存调整
+            adjustments.forEach((categoryIndex, fileId) => {
+                fetch('/api/classify/adjust', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        file_id: fileId,
+                        category_index: categoryIndex
+                    })
+                });
+            });
+        }
+    }
+
+    function executeClassification() {
+        if (confirm('确定要执行分类操作吗？文件将被复制到目标文件夹。')) {
+            window.fileClassifier.showNotification('正在执行分类...', 'info');
+
+            fetch('/api/classify/execute', {
+                method: 'POST'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.fileClassifier.showNotification('分类执行成功！', 'success');
+
+                        // 显示统计信息
+                        let statsText = `成功: ${data.stats.success} 个文件\n`;
+                        statsText += `失败: ${data.stats.failed} 个文件\n\n`;
+
+                        for (const [category, count] of Object.entries(data.stats.category_stats)) {
+                            if (count > 0) {
+                                statsText += `${category}: ${count} 个文件\n`;
+                            }
+                        }
+
+                        alert('分类完成！\n\n' + statsText);
+                    } else {
+                        window.fileClassifier.showNotification('分类执行失败: ' + data.message, 'error');
+                    }
+                });
+        }
+    }
+
+    function confirmClassification() {
+        if (confirm('确认执行最终分类操作？这会将文件复制到目标文件夹。')) {
+            executeClassification();
+        }
+    }
+
+    function rollbackClassification() {
+        if (confirm('确定要撤回分类操作吗？这会将已复制的文件删除。')) {
+            fetch('/api/classify/rollback', {
+                method: 'POST'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.fileClassifier.showNotification('撤回成功！', 'success');
+                    } else {
+                        window.fileClassifier.showNotification('撤回失败: ' + data.message, 'error');
+                    }
+                });
+        }
+    }
+
+    function cleanupFiles() {
+        if (confirm('警告：这将删除源文件夹中已分类的文件。确定要继续吗？')) {
+            fetch('/api/classify/cleanup', {
+                method: 'POST'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.fileClassifier.showNotification('清理完成！', 'success');
+                    } else {
+                        window.fileClassifier.showNotification('清理失败: ' + data.message, 'error');
+                    }
+                });
+        }
+    }
+</script>
+
+<style>
+    .category-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        color: white;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .btn-small {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,478 @@
+<!-- templates/config.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="config-page">
+    <div class="page-header">
+        <h1><i class="fas fa-cogs"></i> 系统配置</h1>
+        <p class="subtitle">管理API密钥、分类标签和文件路径</p>
+    </div>
+
+    <div class="config-tabs">
+        <div class="tabs-header">
+            <button class="tab-btn active" onclick="switchTab('api')">API配置</button>
+            <button class="tab-btn" onclick="switchTab('classification')">分类配置</button>
+            <button class="tab-btn" onclick="switchTab('paths')">路径配置</button>
+            <button class="tab-btn" onclick="switchTab('settings')">系统设置</button>
+        </div>
+
+        <div class="tabs-content">
+            <!-- API配置 -->
+            <div id="api-tab" class="tab-pane active">
+                <form id="api-form">
+                    <div class="form-group">
+                        <label for="api_key">
+                            <i class="fas fa-key"></i> API密钥
+                        </label>
+                        <input type="password" id="api_key" name="api_key" value="{{ config['API']['api_key'] }}"
+                            placeholder="输入您的API密钥" class="form-control">
+                        <small class="form-help">DeepSeek或其他AI服务的API密钥</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="base_url">
+                            <i class="fas fa-link"></i> API基础URL
+                        </label>
+                        <input type="url" id="base_url" name="base_url" value="{{ config['API']['base_url'] }}"
+                            placeholder="https://api.deepseek.com" class="form-control">
+                        <small class="form-help">API服务的端点地址</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="model">
+                            <i class="fas fa-brain"></i> 模型名称
+                        </label>
+                        <input type="text" id="model" name="model" value="{{ config['API']['model'] }}"
+                            placeholder="deepseek-chat" class="form-control">
+                        <small class="form-help">使用的AI模型名称</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 保存API配置
+                        </button>
+                        <button type="button" onclick="testAPI()" class="btn btn-secondary">
+                            <i class="fas fa-plug"></i> 测试连接
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 分类配置 -->
+            <div id="classification-tab" class="tab-pane">
+                <form id="classification-form">
+                    <div class="form-group">
+                        <label for="categories">
+                            <i class="fas fa-tags"></i> 分类标签
+                        </label>
+                        <textarea id="categories" name="categories" class="form-control" rows="3"
+                            placeholder="用逗号分隔分类标签，如：高数1,线代,竞赛相关...">{{ config['CLASSIFICATION']['categories'] }}</textarea>
+                        <small class="form-help">最多支持20个分类标签，用逗号分隔</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="category_paths">
+                            <i class="fas fa-folder-tree"></i> 分类路径映射
+                        </label>
+                        <textarea id="category_paths" name="category_paths" class="form-control code-editor" rows="10"
+                            placeholder="格式：分类标签:相对路径">{{ config['CLASSIFICATION']['category_paths'] }}</textarea>
+                        <small class="form-help">每行一个映射，格式：分类标签:目标路径</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="category_descriptions">
+                            <i class="fas fa-file-alt"></i> 分类描述
+                        </label>
+                        <textarea id="category_descriptions" name="category_descriptions"
+                            class="form-control code-editor" rows="10"
+                            placeholder="格式：分类标签:描述">{{ config['CLASSIFICATION']['category_descriptions'] }}</textarea>
+                        <small class="form-help">帮助AI理解分类含义</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 保存分类配置
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 路径配置 -->
+            <div id="paths-tab" class="tab-pane">
+                <form id="paths-form">
+                    <div class="form-group">
+                        <label for="source_folder">
+                            <i class="fas fa-folder-open"></i> 源文件夹
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="source_folder" name="source_folder"
+                                value="{{ config['PATHS']['source_folder'] }}" class="form-control" placeholder="./未整理">
+                            <button type="button" class="btn btn-secondary" onclick="browseFolder('source_folder')">
+                                <i class="fas fa-folder"></i> 浏览
+                            </button>
+                        </div>
+                        <small class="form-help">待整理文件所在的文件夹</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="target_base_folder">
+                            <i class="fas fa-folder-plus"></i> 目标基础文件夹
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="target_base_folder" name="target_base_folder"
+                                value="{{ config['PATHS']['target_base_folder'] }}" class="form-control"
+                                placeholder="./">
+                            <button type="button" class="btn btn-secondary"
+                                onclick="browseFolder('target_base_folder')">
+                                <i class="fas fa-folder"></i> 浏览
+                            </button>
+                        </div>
+                        <small class="form-help">分类后的文件存放位置</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>路径模式</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="path_mode" value="relative" checked>
+                                <span>相对路径模式</span>
+                                <small>相对于项目根目录</small>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="path_mode" value="absolute">
+                                <span>绝对路径模式</span>
+                                <small>使用完整系统路径</small>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 保存路径配置
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 系统设置 -->
+            <div id="settings-tab" class="tab-pane">
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label for="api_timeout">
+                            <i class="fas fa-clock"></i> API超时时间（秒）
+                        </label>
+                        <input type="number" id="api_timeout" name="api_timeout"
+                            value="{{ config['SETTINGS']['api_timeout'] }}" min="10" max="120" class="form-control">
+                        <small class="form-help">API请求的最长等待时间</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max_retries">
+                            <i class="fas fa-redo"></i> 最大重试次数
+                        </label>
+                        <input type="number" id="max_retries" name="max_retries"
+                            value="{{ config['SETTINGS']['max_retries'] }}" min="0" max="10" class="form-control">
+                        <small class="form-help">失败时重试的次数</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="batch_size">
+                            <i class="fas fa-layer-group"></i> 批量大小
+                        </label>
+                        <input type="number" id="batch_size" name="batch_size" value="30" min="1" max="100"
+                            class="form-control" disabled>
+                        <small class="form-help">每批处理的文件数量（固定为30）</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 保存系统设置
+                        </button>
+                        <button type="button" onclick="resetSettings()" class="btn btn-secondary">
+                            <i class="fas fa-undo"></i> 恢复默认
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="config-actions">
+        <button onclick="window.location.href='/'" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 返回首页
+        </button>
+        <button onclick="saveAllConfig()" class="btn btn-success">
+            <i class="fas fa-save"></i> 保存所有配置
+        </button>
+    </div>
+</div>
+
+<style>
+    .config-page {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem 0;
+    }
+
+    .page-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .config-tabs {
+        background: var(--card-bg);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+    }
+
+    .tabs-header {
+        display: flex;
+        background: var(--bg-color);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .tab-btn {
+        padding: 1rem 2rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+        color: var(--primary-color);
+        background: rgba(37, 99, 235, 0.05);
+    }
+
+    .tab-btn.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+        background: white;
+    }
+
+    .tabs-content {
+        padding: 2rem;
+    }
+
+    .tab-pane {
+        display: none;
+    }
+
+    .tab-pane.active {
+        display: block;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 1rem;
+        transition: border-color 0.2s;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .code-editor {
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+
+    .form-help {
+        display: block;
+        margin-top: 0.25rem;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .input-group {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .input-group .form-control {
+        flex: 1;
+    }
+
+    .radio-group {
+        display: flex;
+        gap: 2rem;
+        margin-top: 0.5rem;
+    }
+
+    .radio-label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        cursor: pointer;
+    }
+
+    .radio-label input[type="radio"] {
+        margin-right: 0.5rem;
+    }
+
+    .radio-label small {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .config-actions {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border-color);
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function switchTab(tabName) {
+        // 更新按钮状态
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+
+        // 显示对应内容
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.classList.remove('active');
+        });
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+    }
+
+    function browseFolder(inputId) {
+        window.fileClassifier.selectFolder().then(path => {
+            if (path) {
+                document.getElementById(inputId).value = path;
+            }
+        });
+    }
+
+    function testAPI() {
+        window.fileClassifier.showNotification('正在测试API连接...', 'info');
+
+        fetch('/api/check')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.fileClassifier.showNotification('API连接正常！', 'success');
+                } else {
+                    window.fileClassifier.showNotification('API连接失败: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                window.fileClassifier.showNotification('测试失败: ' + error.message, 'error');
+            });
+    }
+
+    function saveAllConfig() {
+        const forms = ['api-form', 'classification-form', 'paths-form', 'settings-form'];
+        let allData = {};
+
+        // 收集所有表单数据
+        forms.forEach(formId => {
+            const form = document.getElementById(formId);
+            if (form) {
+                const formData = new FormData(form);
+                formData.forEach((value, key) => {
+                    allData[key] = value;
+                });
+            }
+        });
+
+        // 发送保存请求
+        window.fileClassifier.saveConfig(allData)
+            .then(data => {
+                if (data.success) {
+                    window.fileClassifier.showNotification('所有配置已保存！', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    window.fileClassifier.showNotification('保存失败: ' + data.message, 'error');
+                }
+            });
+    }
+
+    function resetSettings() {
+        if (confirm('确定要恢复默认设置吗？这不会影响API密钥和路径配置。')) {
+            // 这里可以实现重置逻辑
+            window.fileClassifier.showNotification('重置功能开发中...', 'info');
+        }
+    }
+
+    // 表单提交处理
+    document.addEventListener('DOMContentLoaded', function () {
+        const forms = [
+            'api-form',
+            'classification-form',
+            'paths-form',
+            'settings-form'
+        ];
+
+        forms.forEach(formId => {
+            const form = document.getElementById(formId);
+            if (form) {
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+
+                    const formData = new FormData(form);
+                    const data = {};
+                    formData.forEach((value, key) => {
+                        data[key] = value;
+                    });
+
+                    // 发送保存请求
+                    fetch('/api/config/save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            [formId.replace('-form', '')]: data
+                        })
+                    })
+                        .then(response => response.json())
+                        .then(result => {
+                            if (result.success) {
+                                window.fileClassifier.showNotification('配置已保存', 'success');
+                            } else {
+                                window.fileClassifier.showNotification('保存失败: ' + result.message, 'error');
+                            }
+                        });
+                });
+            }
+        });
+    });
+</script>
+{% endblock %}

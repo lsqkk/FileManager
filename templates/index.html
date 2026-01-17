@@ -1,0 +1,214 @@
+<!-- templates/index.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-robot"></i> Quark File Manager</h1>
+        <p class="subtitle">基于AI的自动化文件整理工具</p>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-folder"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="total-files">0</h3>
+                <p>待整理文件</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-tags"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="total-categories">0</h3>
+                <p>分类标签</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-history"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="batch-count">0</h3>
+                <p>分批数量</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-section">
+        <div class="action-card">
+            <h2><i class="fas fa-play-circle"></i> 开始分类</h2>
+            <p>扫描源文件夹并使用AI进行自动分类</p>
+
+            <div class="action-buttons">
+                <button onclick="scanFiles()" class="btn btn-primary">
+                    <i class="fas fa-search"></i> 扫描文件
+                </button>
+
+                <button onclick="startClassification()" class="btn btn-success" id="start-btn" disabled>
+                    <i class="fas fa-brain"></i> AI分类
+                </button>
+
+                <button onclick="viewResults()" class="btn btn-info" id="results-btn" disabled>
+                    <i class="fas fa-list"></i> 查看结果
+                </button>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="progress-container" id="progress-container" style="display: none;">
+                <div class="progress-header">
+                    <span>分类进度</span>
+                    <span id="progress-text">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+                </div>
+                <div class="progress-details">
+                    批次: <span id="batch-info">0/0</span> |
+                    状态: <span id="status-info">等待中</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-card">
+            <h2><i class="fas fa-cog"></i> 系统状态</h2>
+            <div class="status-list">
+                <div class="status-item">
+                    <span class="status-label">API状态:</span>
+                    <span id="api-status" class="status-badge status-pending">检查中...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">源文件夹:</span>
+                    <span id="source-folder">未设置</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">配置文件:</span>
+                    <span id="config-status" class="status-badge status-success">已加载</span>
+                </div>
+            </div>
+
+            <div class="quick-actions">
+                <button onclick="checkAPI()" class="btn btn-secondary">
+                    <i class="fas fa-sync"></i> 检查API
+                </button>
+                <button onclick="window.location.href='/config'" class="btn btn-secondary">
+                    <i class="fas fa-sliders-h"></i> 配置管理
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 页面加载时检查状态
+    document.addEventListener('DOMContentLoaded', function () {
+        checkSystemStatus();
+        checkAPI();
+    });
+
+    function checkSystemStatus() {
+        fetch('/api/files/scan')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('total-files').textContent = data.count;
+                    document.getElementById('batch-count').textContent = data.batches;
+
+                    if (data.count > 0) {
+                        document.getElementById('start-btn').disabled = false;
+                    }
+                }
+            });
+    }
+
+    function checkAPI() {
+        const statusEl = document.getElementById('api-status');
+        statusEl.className = 'status-badge status-pending';
+        statusEl.textContent = '检查中...';
+
+        fetch('/api/check')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusEl.className = 'status-badge status-success';
+                    statusEl.textContent = '正常';
+                } else {
+                    statusEl.className = 'status-badge status-error';
+                    statusEl.textContent = '失败';
+                }
+            });
+    }
+
+    function scanFiles() {
+        fetch('/api/files/scan')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('total-files').textContent = data.count;
+                    document.getElementById('total-categories').textContent = data.categories || 14; // 使用返回的分类数量
+                    document.getElementById('start-btn').disabled = false;
+                    alert(`扫描完成！找到 ${data.count} 个文件，分为 ${data.batches} 批`);
+                    document.getElementById('total-files').textContent = data.count;
+                    document.getElementById('batch-count').textContent = data.batches;
+                    document.getElementById('start-btn').disabled = false;
+                } else {
+                    alert('扫描失败: ' + data.message);
+                }
+            });
+    }
+
+    function startClassification() {
+        const progressContainer = document.getElementById('progress-container');
+        progressContainer.style.display = 'block';
+
+        fetch('/api/classify/start', {
+            method: 'POST'
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 开始轮询进度
+                    pollProgress();
+                }
+            });
+    }
+
+    function pollProgress() {
+        const interval = setInterval(() => {
+            fetch('/api/classify/status')
+                .then(response => response.json())
+                .then(data => {
+                    // 更新进度条
+                    const progress = data.progress || 0;
+                    document.getElementById('progress-fill').style.width = progress + '%';
+                    document.getElementById('progress-text').textContent = progress + '%';
+                    document.getElementById('batch-info').textContent =
+                        `${data.current_batch || 0}/${data.total_batches || 0}`;
+                    document.getElementById('status-info').textContent =
+                        data.status === 'processing' ? '处理中' : data.status;
+
+                    // 检查是否完成
+                    if (data.status === 'completed') {
+                        clearInterval(interval);
+                        document.getElementById('results-btn').disabled = false;
+                        alert('AI分类完成！');
+                    } else if (data.status === 'error') {
+                        clearInterval(interval);
+                        alert('分类出错！');
+                    }
+                });
+        }, 1000);
+    }
+
+    function viewResults() {
+        window.location.href = '/classify/results';
+    }
+</script>
+{% endblock %}
